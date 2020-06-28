@@ -1,0 +1,28 @@
+{
+  "name": "foilthepolice-text-extract",
+  "version": "0.0.1",
+  "description": "Test interface with AWS Textract + S3 to get structured data out of large report files",
+  "main": "src/server.js",
+  "dependencies": {
+    "aws-sdk": "^2.706.0",
+    "body-parser": "^1.19.0",
+    "date-fns": "^2.14.0",
+    "dotenv": "^8.2.0",
+    "express": "^4.17.1",
+    "multer": "^1.4.2",
+    "uuid": "^8.2.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.4"
+  },
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foilthepolice/foilthepolice-text-extract.git"
+  },
+  "author": ""
+}
