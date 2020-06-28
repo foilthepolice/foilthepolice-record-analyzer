@@ -1,0 +1,26 @@
+version: '3'
+
+services:
+  api:
+    build:
+      context: .
+    volumes:
+      - ./:/usr/src/api
+      - /usr/src/api/node_modules
+    ports:
+      - '3000:3000'
+    depends_on:
+      - postgres
+    command: npm run dev
+    env_file:
+      - ./.env
+
+  postgres:
+    build:
+      context: ./database
+    environment:
+      POSTGRES_DB: foilthepolice
+      POSTGRES_USER: foilthepolice
+      POSTGRES_PASSWORD: foilthepolice
+    ports:
+      - '5432:5432'
