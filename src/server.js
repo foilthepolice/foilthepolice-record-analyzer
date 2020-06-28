@@ -22,12 +22,11 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.post('/extract', upload.single('pdf'), (req, res) => {
   try {
     if (!req.file) throw new Error('PDF key missing file passed as form-data.')
-    const s3Key = uuid();
     s3.upload({
       ACL: 'public-read',
       Body: req.file.buffer,
       Expires: dts.addMinutes(new Date(), 15),
-      Key: s3Key,
+      Key: uuid(),
     }, (err, upload) => {
       if (err) throw err;
       textract.startDocumentAnalysis({
@@ -45,7 +44,9 @@ app.post('/extract', upload.single('pdf'), (req, res) => {
           textract.getDocumentAnalysis({ JobId }, (err, data) => {
             if (err) throw err;
             if (data.JobStatus === 'SUCCEEDED') {
+              console.log('Job done!', data)
               res.send(data);
+              clearInterval(intervalId);
             } else if (data.JobStatus === 'FAILED') {
               console.log('Job failed!', data)
               clearInterval(intervalId);
