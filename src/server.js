@@ -26,7 +26,7 @@ app.post('/analyze', upload.single('pdf'), (req, res) => {
       ACL: 'public-read',
       Body: req.file.buffer,
       Expires: dts.addMinutes(new Date(), 15),
-      Key: uuid(),
+      Key: `${uuid()}_${req.file.originalname}`.replace(/\s/, '_'),
     }, (err, upload) => {
       if (err) throw err;
       textract.startDocumentAnalysis({
