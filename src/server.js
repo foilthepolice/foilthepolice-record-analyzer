@@ -57,7 +57,7 @@ app.get('/analyze/:jobId', (req, res) => {
       textract.getDocumentAnalysis({ JobId: req.params.jobId }, (err, data) => {
         if (err) throw err;
         if (data.JobStatus === 'SUCCEEDED') {
-          console.log('Job done!', data)
+          console.log('Job done!')
           res.send(data);
           clearInterval(intervalId);
         } else if (data.JobStatus === 'FAILED') {
