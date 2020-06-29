@@ -44,15 +44,7 @@ const textract = new AWS.Textract({
 
 const startDocumentAnalysis = async (config) => {
   return new Promise((resolve, reject) => {
-    textract.startDocumentAnalysis({
-      DocumentLocation: {
-        S3Object: {
-          Bucket: file.bucket,
-          Name: file.key,
-        }
-      },
-      FeatureTypes: ['FORMS'],
-    }, (err, data) => {
+    textract.startDocumentAnalysis(config, (err, data) => {
       if (err) return reject(err);
       resolve(data.JobId);
     });
@@ -69,9 +61,8 @@ const getDocumentAnalysis = async (textractJobId) => {
         // If succeeded, return the key/value parsed data
         if (data.JobStatus === 'SUCCEEDED') {
           console.log('Job done!')
-          const keyValues = keyValuesFromBlocks(data.Blocks);
           clearInterval(intervalId);
-          resolve(keyValues);
+          resolve(data);
         } else if (data.JobStatus === 'FAILED') {
           console.log('Job failed!', data)
           clearInterval(intervalId);

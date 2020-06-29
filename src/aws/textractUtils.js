@@ -41,19 +41,6 @@ const findValueBlock = (keyBlock, valueMap) => {
   return valueBlock;
 };
 
-const getKeyValueRelationship = (keyMap, valueMap, blockMap) => {
-  const keyValues = {};
-  const keyMapValues = _.values(keyMap);
-  keyMapValues.forEach(keyMapValue => {
-    const valueBlock = findValueBlock(keyMapValue, valueMap);
-    const key = getText(keyMapValue, blockMap);
-    const value = getText(valueBlock, blockMap);
-    if (!keyValues[key]) keyValues[key] = [];
-    keyValues[key].push(value);
-  });
-  return keyValues;
-};
-
 const getKeyValueMap = blocks => {
   const keyMap = {};
   const valueMap = {};
@@ -73,6 +60,20 @@ const getKeyValueMap = blocks => {
   return { keyMap, valueMap, blockMap };
 };
 
+const getKeyValueRelationship = (keyMap, valueMap, blockMap) => {
+  const keyValues = {};
+  const keyMapValues = _.values(keyMap);
+  keyMapValues.forEach(keyMapValue => {
+    const valueBlock = findValueBlock(keyMapValue, valueMap);
+    const key = getText(keyMapValue, blockMap);
+    const value = getText(valueBlock, blockMap);
+    // NOTE: Expect key/values to be overriden if they share same label
+    keyValues[key] = value;
+  });
+  return keyValues;
+};
+
+// Straight forward data block key/value mapper
 const keyValuesFromBlocks = blocks => {
   const { keyMap, valueMap, blockMap } = getKeyValueMap(blocks);
   const keyValues = getKeyValueRelationship(keyMap, valueMap, blockMap);
@@ -80,5 +81,9 @@ const keyValuesFromBlocks = blocks => {
 }
 
 module.exports = {
+  findValueBlock,
+  getText,
+  getKeyValueMap,
+  getKeyValueRelationship,
   keyValuesFromBlocks,
 };
