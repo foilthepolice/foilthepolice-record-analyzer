@@ -106,7 +106,34 @@ router.post(
   });
 
 // ...
-// 4) Poll job id until SUCCEEDED response from all files
+// 4) Poll internal job id until SUCCEEDED response from all files. Gives back json array of report data
+//
+// Example response:
+// [{
+//   "date": "12/27/19",
+//   "time": "10:45",
+//   "day_of_week": "Friday",
+//   "incident_number": "19-38915",
+//   "location": "1000 Route 10 Whippany, NJ",
+//   "officer_badge_number": "754",
+//   "officer_name": "PO Joseph Quinn III 754",
+//   "officer_race": "Cauc",
+//   "officer_sex": "M",
+//   "officer_age": "51",
+//   "officer_rank": "Patroiman",
+//   "officer_on_duty": "Yes",
+//   "officer_uniform": "Yes",
+//   "officer_assignment": "Patrol",
+//   "officer_years_of_service": "22",
+//   "officer_injured": "No",
+//   "officer_killed": "No",
+//   "subject_race": "Black",
+//   "subject_sex": "M",
+//   "subject_age": "18",
+//   "subject_under_influence": "",
+//   "subject_unusual_conduct": "",
+//   ...
+// }]
 router.get(
   '/v1/analysis/:recordJobId',
   async (req, res, next) => {
