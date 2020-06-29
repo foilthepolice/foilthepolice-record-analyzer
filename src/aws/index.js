@@ -3,7 +3,6 @@ const dts = require('date-fns');
 const uuid = require('uuid').v4;
 
 const Env = require('../env');
-const { keyValuesFromBlocks } = require('./textractUtils');
 
 const s3 = new AWS.S3({
   params: {
