@@ -15,6 +15,7 @@
     "objection": "^2.2.0",
     "pdf-image": "^2.0.0",
     "pg": "^8.2.1",
+    "string-similarity": "^4.0.1",
     "tmp": "^0.2.1",
     "uuid": "^8.2.0"
   },
