@@ -14,5 +14,8 @@ const knexConfig = {
   pool: undefined,
 };
 
-// OBJECTION
-export const knex = Knex({ ...knexConfig, ...knexSnakeCaseMappers() });
+const knex = Knex({ ...knexConfig, ...knexSnakeCaseMappers() });
+
+module.exports = {
+  knex,
+};
