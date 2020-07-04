@@ -60,25 +60,20 @@ const startDocumentAnalysis = async (config) => {
 
 const getDocumentAnalysis = async (textractJobId) => {
   return new Promise((resolve, reject) => {
-    let intervalId;
-    // Poll for textract job results...
-    intervalId = setInterval(() => {
-      textract.getDocumentAnalysis({ JobId: textractJobId }, (err, data) => {
-        if (err) return reject(err);
-        // If succeeded, return the key/value parsed data
-        if (data.JobStatus === 'SUCCEEDED') {
-          console.log(new Date(), 'getDocumentAnalysis(): Done & Data Received')
-          clearInterval(intervalId);
-          resolve(data);
-        } else if (data.JobStatus === 'FAILED') {
-          console.log(new Date(), 'getDocumentAnalysis(): Failed', data)
-          clearInterval(intervalId);
-          reject(data);
-        } else {
-          console.log(new Date(), 'getDocumentAnalysis(): In Progress', data)
-        }
-      });
-    }, 1000);
+    textract.getDocumentAnalysis({ JobId: textractJobId }, (err, data) => {
+      if (err) return reject(err);
+      // If succeeded, return the key/value parsed data
+      if (data.JobStatus === 'SUCCEEDED') {
+        console.log(new Date(), 'getDocumentAnalysis(): Done & Data Received')
+        resolve(data);
+      } else if (data.JobStatus === 'FAILED') {
+        console.log(new Date(), 'getDocumentAnalysis(): Failed', data)
+        reject(data);
+      } else {
+        console.log(new Date(), 'getDocumentAnalysis(): In Progress')
+        resolve(null);
+      }
+    });
   });
 }
 
