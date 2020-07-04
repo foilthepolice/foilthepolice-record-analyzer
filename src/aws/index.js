@@ -22,7 +22,11 @@ const upload = async (name, buffer) => {
       Expires: dts.addMinutes(new Date(), 15),
       Key: `${uuid()}_${name}`.replace(/\s/, '_'),
     }, (err, upload) => {
-      if (err) return reject(err);
+      if (err) {
+        console.log(new Date(), `upload(): Upload Failed - ${err.message}`);
+        return reject(err);
+      }
+      console.log(new Date(), 'upload(): Upload Success');
       resolve({
         bucket: upload.Bucket,
         expiration: upload.Expiration,
@@ -44,7 +48,11 @@ const textract = new AWS.Textract({
 const startDocumentAnalysis = async (config) => {
   return new Promise((resolve, reject) => {
     textract.startDocumentAnalysis(config, (err, data) => {
-      if (err) return reject(err);
+      if (err) {
+        console.log(new Date(), `startDocumentAnalysis(): Analysis Failed - ${err.message}`)
+        return reject(err);
+      }
+      console.log(new Date(), 'startDocumentAnalysis(): Analysis Started')
       resolve(data.JobId);
     });
   });
@@ -59,15 +67,15 @@ const getDocumentAnalysis = async (textractJobId) => {
         if (err) return reject(err);
         // If succeeded, return the key/value parsed data
         if (data.JobStatus === 'SUCCEEDED') {
-          console.log('Job done!')
+          console.log(new Date(), 'getDocumentAnalysis(): Done & Data Received')
           clearInterval(intervalId);
           resolve(data);
         } else if (data.JobStatus === 'FAILED') {
-          console.log('Job failed!', data)
+          console.log(new Date(), 'getDocumentAnalysis(): Failed', data)
           clearInterval(intervalId);
           reject(data);
         } else {
-          console.log('Job in progress...', data)
+          console.log(new Date(), 'getDocumentAnalysis(): In Progress', data)
         }
       });
     }, 1000);
