@@ -40,6 +40,7 @@ schedule.scheduleJob('*/5 * * * * *', async (dateTime) => {
   const textractJob = await knex('textract_job')
     .whereNotNull('textractJobId')
     .whereNull('data')
+    .orderBy('id')
     .first();
   if (textractJob) {
     console.log(dateTime, `Textract Fetch: Job #${textractJob.id}`);
@@ -48,9 +49,14 @@ schedule.scheduleJob('*/5 * * * * *', async (dateTime) => {
   }
   // Fetch textract job data
   const textractJobData = await getDocumentAnalysis(textractJob.textractJobId);
-  // Update database record
-  await knex('textract_job')
-    .where({ id: textractJob.id })
-    .update({ data: textractJobData });
-  console.log(dateTime, `Textract Fetch: Finished: #${textractJob.id}`);
+
+  if (textractJobData) {
+    // Update database record
+    await knex('textract_job')
+      .where({ id: textractJob.id })
+      .update({ data: textractJobData });
+    console.log(dateTime, `Textract Fetch: Finished: #${textractJob.id}`);
+  } else {
+    console.log(dateTime, `Textract Fetch: In Progress: #${textractJob.id}`);
+  }
 });
