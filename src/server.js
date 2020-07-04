@@ -9,9 +9,10 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // API
 app.use(records);
-
-// Error Handler
+// - Error Handler
 app.use((err, req, res, next) => res.status(500).send(err));
-
-// Start Server
+// - Start Server
 app.listen(Env.getPort(), () => console.log(`API Server Port: ${Env.getPort()}`));
+
+// CRON
+require('./records/scheduled');
