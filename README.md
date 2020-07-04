@@ -2,7 +2,7 @@
 
 A small server/worker you can run to turn Use of Force Report PDFs into structured data for anaylsis. Uses machine learning via AWS Textract.
 
-We imagine two future steps for this tool. 1) Improving the flexibility in analyzing use of force reports that differ drastically in format. 2) Allowing the analysis of police contracts for statements that suggest qualified immunity.
+We imagine two future steps for this tool. 1) Improving the flexibility in analyzing use of force reports that differ drastically in format. 2) Allowing the analysis of police union contracts to find ways that block police officers from being held accountable.
 
 If you're interested in helping, please send a message to: contact@foilthepolice.org
 
