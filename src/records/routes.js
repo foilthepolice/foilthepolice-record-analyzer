@@ -43,43 +43,51 @@ router.post(
   async (req, res, next) => {
     try {
       if (!req.file) throw new Error('PDF key missing file passed as form-data.')
+      console.log(new Date(), `Analyze: New Job`);
       // Create database record
       const recordJob = await knex('record_job')
         .insert({ createdAt: new Date() })
         .returning('*')
         .then((res) => res[0]);
+      console.log(new Date(), `Analyze: New Job Created: #${recordJob.id}`);
       const dir = tmp.dirSync();
+      console.log(new Date(), `Analyze: #${recordJob.id} - Tmp directory Created "${dir.name}"`);
       // Handle PDF prep
       const pdfPath = `${dir.name}/${req.file.originalname}`;
       fs.writeFileSync(pdfPath, req.file.buffer);
+      console.log(new Date(), `Analyze: #${recordJob.id} - Converting PDF>PNGs`);
       // Handle creating PNGs
       const pdfImagePaths = await new Promise((resolve) => {
         const pdfImage = new PDFImage(pdfPath, {
           convertOptions: {
-            "-density": "300",
+            "-density": "225",
             "-quality": "100",
           },
         });
-        pdfImage.convertFile().then(resolve)
+        return pdfImage.convertFile().then(resolve)
       });
+      console.log(new Date(), `Analyze: #${recordJob.id} - Converted to ${pdfImagePaths.length} PNGs`);
       // Queue an analysis job for each file
-      await Promise.all(
-        pdfImagePaths.map(async (imagePath, imagePathIndex) => {
-          const buffer = fs.readFileSync(imagePath);
-          // - File Upload to S3 (required for form analysis)
-          const file = await upload(imagePath.slice(imagePath.lastIndexOf('/') + 1), buffer);
-          // - Create textract db record to run anaylsis on via cron
-          return knex('textract_job').insert({
-            recordJobId: recordJob.id,
-            page: imagePathIndex + 1,
-            fileBucket: file.bucket,
-            fileKey: file.key,
-          });
-        }),
-      );
+      for (let i = 0; i < pdfImagePaths.length; i += 1) {
+        const imagePathIndex = i;
+        const imagePath = pdfImagePaths[imagePathIndex];
+        console.log(new Date(), `Analyze: #${recordJob.id} - Uploading PNG ${imagePathIndex}`);
+        const buffer = fs.readFileSync(imagePath);
+        // - File Upload to S3 (required for form analysis)
+        const file = await upload(imagePath.slice(imagePath.lastIndexOf('/') + 1), buffer);
+        // - Create textract db record to run anaylsis on via cron
+        console.log(new Date(), `Analyze: #${recordJob.id} - Uploaded PNG ${imagePathIndex} and creating database record`);
+        await knex('textract_job').insert({
+          recordJobId: recordJob.id,
+          page: imagePathIndex + 1,
+          fileBucket: file.bucket,
+          fileKey: file.key,
+        });
+      }
       // Clean up tmp files/directory
       fs.rmdirSync(dir.name, { recursive: true });
       // Respond
+      console.log(new Date(), `Analyze: #${recordJob.id} - Done Uploading & Creating Records`);
       res.status(200).send({ jobId: recordJob.id, success: true });
     } catch (e) {
       console.log(e);
@@ -140,7 +148,17 @@ router.get(
         ...obj,
       }), {}));
       // Respond
-      res.status(200).send({ data, status: 'done', success: true });
+      if (req.query.format === 'csv') {
+        if (data.length === 0) {
+          res.status(200).type('text/plain').send('');
+        } else {
+          const keys = Object.keys(data[0]);
+          const str = `${keys.join(',')}\n${data.map(d => Object.values(d).map(v => `"${v.replace(/,/g,'')}"`).join(',')).join('\n')}`;
+          res.status(200).type('text/plain').send(str);
+        }
+      } else {
+        res.status(200).send({ data, status: 'done', success: true });
+      }
     } catch (e) {
       console.log(e);
       next({ message: e.message });
