@@ -140,7 +140,17 @@ router.get(
         ...obj,
       }), {}));
       // Respond
-      res.status(200).send({ data, status: 'done', success: true });
+      if (req.query.format === 'csv') {
+        if (data.length === 0) {
+          res.status(200).type('text/plain').send('');
+        } else {
+          const keys = Object.keys(data[0]);
+          const str = `${keys.join(',')}\n${data.map(d => Object.values(d).map(v => `"${v.replace(/,/g,'')}"`).join(',')).join('\n')}`;
+          res.status(200).type('text/plain').send(str);
+        }
+      } else {
+        res.status(200).send({ data, status: 'done', success: true });
+      }
     } catch (e) {
       console.log(e);
       next({ message: e.message });
