@@ -5,7 +5,7 @@ const multer = require('multer');
 const path = require('path');
 const tmp = require('tmp');
 const { knex } = require('../orm');
-const { getDocumentAnalysis, startDocumentAnalysis, upload } = require('../aws');
+const { upload } = require('../aws');
 const getStructuredUseOfForceReportData = require('./getStructuredUseOfForceReportData');
 
 const router = Router();
@@ -70,35 +70,25 @@ router.post(
         });
         pdfImage.convertFile().then(resolve)
       });
-      // Run analysis for each file
-      const textractJobIds = await Promise.all(
+      // Queue an analysis job for each file
+      await Promise.all(
         pdfImagePaths.map(async (imagePath, imagePathIndex) => {
           const buffer = fs.readFileSync(imagePath);
           // - File Upload to S3 (required for form analysis)
           const file = await upload(imagePath.slice(imagePath.lastIndexOf('/') + 1), buffer);
-          // - Start Analysis
-          const textractJobId = await startDocumentAnalysis({
-            DocumentLocation: {
-              S3Object: {
-                Bucket: file.bucket,
-                Name: file.key,
-              },
-            },
-            FeatureTypes: ['FORMS'],
-          });
-          // - Create textract db record related to our record for querying later
-          await knex('textract_job').insert({
+          // - Create textract db record to run anaylsis on via cron
+          return knex('textract_job').insert({
             recordJobId: recordJob.id,
-            textractJobId,
             page: imagePathIndex + 1,
+            fileBucket: file.bucket,
+            fileKey: file.key,
           });
-          return textractJobId;
         }),
-      )
+      );
       // Clean up tmp files/directory
       fs.rmdirSync(dir.name, { recursive: true });
       // Respond
-      res.status(200).send({ jobId: recordJob.id, textractJobIds });
+      res.status(200).send({ jobId: recordJob.id });
     } catch (e) {
       console.log(e);
       next({ message: e.message });
@@ -142,18 +132,10 @@ router.get(
       // Get related textract jobs for this id
       const textractJobs = await knex('textract_job')
         .where({ recordJobId: req.params.recordJobId })
+        .whereNotNull('data')
         .returning('*');
-      // Get analysis for each
-      const textractJobsData = await Promise.all(textractJobs.map(async (job) => {
-        // - If we have data return, otherwise get w/ job id
-        if (job.data) return job;
-        const textractJobData = await getDocumentAnalysis(job.textractJobId);
-        // - Save data
-        await knex('textract_job').where({ id: job.id }).update({ data: textractJobData });
-        return { ...job, data: textractJobData };
-      }));
       // Reformat keys depending on document
-      const formatted = Object.values(textractJobsData.reduce((obj, job) => ({
+      const formatted = Object.values(textractJobs.reduce((obj, job) => ({
         [job.page]: getStructuredUseOfForceReportData(job.data.Blocks),
         ...obj,
       }), {}));
