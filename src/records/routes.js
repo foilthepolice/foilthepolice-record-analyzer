@@ -34,15 +34,7 @@ const fileMiddleware = multer({
 // Example response:
 // {
 //   "jobId": 18,
-//   "textractJobIds": [
-//       "06c7647dea5e7f4c5d9e149d1fdab2ece374a9e4a0b867d5045e7755ca590fe9",
-//       "05b85573d8dc2b31d367bad9cec04e7f1d109e702c8ef022a010c41373d00ed5",
-//       "5b8dcce6b357e97e47d50ab35e0312860ca3d95d0f8c0251e181011318cf480e",
-//       "5f3009e49ab69cc1881d215b5c31dc46173e2b12d61505e4c55905e7d6902f3f",
-//       "fc5bcd4de7a66130e6ae022d5d8f8405795da225aaad30e35c2aa712c4c64e05",
-//       "4c2f9f77809bbc4db765a1598647a55301a3ec42a7931eb324454e2b12993f1a",
-//       "1eade3f99e7f0380f12928bf48d45f781b235eac38660e05384c1a91f478bb7c"
-//   ]
+//   "success": true
 // }
 //
 router.post(
@@ -88,7 +80,7 @@ router.post(
       // Clean up tmp files/directory
       fs.rmdirSync(dir.name, { recursive: true });
       // Respond
-      res.status(200).send({ jobId: recordJob.id });
+      res.status(200).send({ jobId: recordJob.id, success: true });
     } catch (e) {
       console.log(e);
       next({ message: e.message });
@@ -99,48 +91,56 @@ router.post(
 // 4) Poll internal job id until SUCCEEDED response from all files. Gives back json array of report data
 //
 // Example response:
-// [{
-//   "date": "12/27/19",
-//   "time": "10:45",
-//   "day_of_week": "Friday",
-//   "incident_number": "19-38915",
-//   "location": "1000 Route 10 Whippany, NJ",
-//   "officer_badge_number": "754",
-//   "officer_name": "PO Joseph Quinn III 754",
-//   "officer_race": "Cauc",
-//   "officer_sex": "M",
-//   "officer_age": "51",
-//   "officer_rank": "Patroiman",
-//   "officer_on_duty": "Yes",
-//   "officer_uniform": "Yes",
-//   "officer_assignment": "Patrol",
-//   "officer_years_of_service": "22",
-//   "officer_injured": "No",
-//   "officer_killed": "No",
-//   "subject_race": "Black",
-//   "subject_sex": "M",
-//   "subject_age": "18",
-//   "subject_under_influence": "",
-//   "subject_unusual_conduct": "",
-//   ...
-// }]
+// {
+//   data:
+//     [{
+//       "date": "12/27/19",
+//       "time": "10:45",
+//       "day_of_week": "Friday",
+//       "incident_number": "19-38915",
+//       "location": "1000 Route 10 Whippany, NJ",
+//       "officer_badge_number": "754",
+//       "officer_name": "PO Joseph Quinn III 754",
+//       "officer_race": "Cauc",
+//       "officer_sex": "M",
+//       "officer_age": "51",
+//       "officer_rank": "Patroiman",
+//       "officer_on_duty": "Yes",
+//       "officer_uniform": "Yes",
+//       "officer_assignment": "Patrol",
+//       "officer_years_of_service": "22",
+//       "officer_injured": "No",
+//       "officer_killed": "No",
+//       "subject_race": "Black",
+//       "subject_sex": "M",
+//       "subject_age": "18",
+//       "subject_under_influence": "",
+//       "subject_unusual_conduct": "",
+//     ...
+//     }]
+//   success: true
+// }
 router.get(
   '/v1/analysis/:recordJobId',
   async (req, res, next) => {
     try {
       if (!req.params.recordJobId) throw new Error('Missing analysis job id');
-      // Get related textract jobs for this id
+      // Get related textract jobs for this internal job id
       const textractJobs = await knex('textract_job')
         .where({ recordJobId: req.params.recordJobId })
-        .whereNotNull('data')
         .returning('*');
+      // If we have any missing data, respond in progress
+      if (textractJobs.some(job => job.data == null)) {
+        return res.status(200).send({ status: 'inProgress', success: true });
+      }
       // Reformat keys depending on document
-      const formatted = Object.values(textractJobs.reduce((obj, job) => ({
+      // TODO: If CSV query param, restructure
+      const data = Object.values(textractJobs.reduce((obj, job) => ({
         [job.page]: getStructuredUseOfForceReportData(job.data.Blocks),
         ...obj,
       }), {}));
-      // - If CSV query param, restructure
-      res.status(200).send(formatted);
+      // Respond
+      res.status(200).send({ data, status: 'done', success: true });
     } catch (e) {
       console.log(e);
       next({ message: e.message });
