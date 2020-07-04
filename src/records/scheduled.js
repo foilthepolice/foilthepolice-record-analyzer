@@ -3,7 +3,7 @@ const { knex } = require('../orm');
 const { getDocumentAnalysis, startDocumentAnalysis } = require('../aws');
 
 // Textract Analysis Start
-schedule.scheduleJob('*/1 * * * *', async (dateTime) => {
+schedule.scheduleJob('*/15 * * * * *', async (dateTime) => {
   console.log(dateTime, 'Textract Analysis: Running');
   // Get a job to analyze
   const textractJob = await knex('textract_job')
@@ -34,7 +34,7 @@ schedule.scheduleJob('*/1 * * * *', async (dateTime) => {
 });
 
 // Textract Fetch & Save
-schedule.scheduleJob('*/1 * * * *', async (dateTime) => {
+schedule.scheduleJob('*/5 * * * * *', async (dateTime) => {
   console.log(dateTime, 'Textract Fetch: Running');
   // Get a job to fetcch
   const textractJob = await knex('textract_job')
