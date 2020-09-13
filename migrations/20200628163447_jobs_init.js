@@ -3,6 +3,7 @@ exports.up = async function(knex) {
   await knex.schema
     .createTable('record_job', (table) => {
       table.increments('id').primary();
+      table.text('note');
       table.timestamp('created_at').defaultTo(knex.raw('now()'));
     })
     .createTable('textract_job', (table) => {

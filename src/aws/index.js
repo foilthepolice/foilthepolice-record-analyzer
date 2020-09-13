@@ -77,10 +77,71 @@ const getDocumentAnalysis = async (textractJobId) => {
   });
 }
 
+const startDocumentTextDetection = async (config) => {
+  return new Promise((resolve, reject) => {
+    textract.startDocumentTextDetection(config, (err, data) => {
+      if (err) {
+        console.log(new Date(), `startDocumentTextDetection(): Text Detection Failed - ${err.message}`)
+        return reject(err);
+      }
+      console.log(new Date(), 'startDocumentTextDetection(): Text Detection Started')
+      resolve(data.JobId);
+    });
+  });
+}
+
+// Fetch all chunks split across requests with nextToken
+// When no more next token return the data
+async function getDocumentTextDetectionChunk(jobId, priorData = { Blocks: [] }, nextToken) {
+  return new Promise((resolve, reject) => {
+    textract.getDocumentTextDetection({ JobId: jobId, MaxResults: 1000, NextToken: nextToken }, async (err, nextChunk) => {
+      if (err) return reject(err);
+      const newData = {
+        ...nextChunk.data,
+        Blocks: [
+          ...(priorData.Blocks || []),
+          ...nextChunk.Blocks,
+        ],
+      };
+      console.log(new Date(), `getDocumentTextDetectionChunk() ${jobId}`,  (priorData.Blocks || []).length, '>', (newData.Blocks || []).length);
+      if (!nextChunk.NextToken) return resolve(newData)
+      resolve(getDocumentTextDetectionChunk(
+        jobId,
+        newData,
+        nextChunk.NextToken
+      ));
+    })
+  });
+}
+
+const getDocumentTextDetection = async (textractJobId) => {
+  return new Promise((resolve, reject) => {
+    // Ping just to see if we have results
+    textract.getDocumentTextDetection({ JobId: textractJobId, MaxResults: 1 }, async (err, data) => {
+      if (err) return reject(err);
+      // If succeeded, fetch all data and concat
+      if (data.JobStatus === 'SUCCEEDED') {
+        console.log(new Date(), 'getDocumentAnalysis(): Done & Data Received')
+        const compiled = await getDocumentTextDetectionChunk(textractJobId);
+        resolve(compiled);
+      } else if (data.JobStatus === 'FAILED') {
+        console.log(new Date(), 'getDocumentAnalysis(): Failed', data)
+        reject(data);
+      } else {
+        console.log(new Date(), 'getDocumentAnalysis(): In Progress')
+        resolve(null);
+      }
+    });
+  });
+}
+
+
 module.exports = {
   getDocumentAnalysis,
+  getDocumentTextDetection,
   s3,
   startDocumentAnalysis,
+  startDocumentTextDetection,
   textract,
   upload,
 };

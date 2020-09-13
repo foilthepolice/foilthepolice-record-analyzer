@@ -7,6 +7,8 @@ const tmp = require('tmp');
 const { knex } = require('../orm');
 const { upload } = require('../aws');
 const getStructuredUseOfForceReportData = require('./getStructuredUseOfForceReportData');
+const getPlainTextDocumentData = require('./getPlainTextDocumentData');
+const TEXTRACT_TYPES = require('./textractTypes');
 
 const router = Router();
 
@@ -43,19 +45,23 @@ router.post(
   async (req, res, next) => {
     try {
       if (!req.file) throw new Error('PDF key missing file passed as form-data.')
-      console.log(new Date(), `Analyze: New Job`);
+      console.log(new Date(), `Analyze Form: New Job`);
       // Create database record
       const recordJob = await knex('record_job')
-        .insert({ createdAt: new Date() })
+        .insert({
+          createdAt: new Date(),
+          type: TEXTRACT_TYPES.FORM,
+          note: req.file.originalname,
+        })
         .returning('*')
         .then((res) => res[0]);
-      console.log(new Date(), `Analyze: New Job Created: #${recordJob.id}`);
+      console.log(new Date(), `Analyze Form: New Job Created: #${recordJob.id}`);
       const dir = tmp.dirSync();
-      console.log(new Date(), `Analyze: #${recordJob.id} - Tmp directory Created "${dir.name}"`);
+      console.log(new Date(), `Analyze Form: #${recordJob.id} - Tmp directory Created "${dir.name}"`);
       // Handle PDF prep
       const pdfPath = `${dir.name}/${req.file.originalname}`;
       fs.writeFileSync(pdfPath, req.file.buffer);
-      console.log(new Date(), `Analyze: #${recordJob.id} - Converting PDF>PNGs`);
+      console.log(new Date(), `Analyze Form: #${recordJob.id} - Converting PDF>PNGs`);
       // Handle creating PNGs
       const pdfImagePaths = await new Promise((resolve) => {
         const pdfImage = new PDFImage(pdfPath, {
@@ -66,28 +72,63 @@ router.post(
         });
         return pdfImage.convertFile().then(resolve)
       });
-      console.log(new Date(), `Analyze: #${recordJob.id} - Converted to ${pdfImagePaths.length} PNGs`);
+      console.log(new Date(), `Analyze Form: #${recordJob.id} - Converted to ${pdfImagePaths.length} PNGs`);
       // Queue an analysis job for each file
       for (let i = 0; i < pdfImagePaths.length; i += 1) {
         const imagePathIndex = i;
         const imagePath = pdfImagePaths[imagePathIndex];
-        console.log(new Date(), `Analyze: #${recordJob.id} - Uploading PNG ${imagePathIndex}`);
+        console.log(new Date(), `Analyze Form: #${recordJob.id} - Uploading PNG ${imagePathIndex}`);
         const buffer = fs.readFileSync(imagePath);
         // - File Upload to S3 (required for form analysis)
         const file = await upload(imagePath.slice(imagePath.lastIndexOf('/') + 1), buffer);
         // - Create textract db record to run anaylsis on via cron
-        console.log(new Date(), `Analyze: #${recordJob.id} - Uploaded PNG ${imagePathIndex} and creating database record`);
+        console.log(new Date(), `Analyze Form: #${recordJob.id} - Uploaded PNG ${imagePathIndex} and creating database record`);
         await knex('textract_job').insert({
           recordJobId: recordJob.id,
           page: imagePathIndex + 1,
           fileBucket: file.bucket,
           fileKey: file.key,
+          type: TEXTRACT_TYPES.FORM,
         });
       }
       // Clean up tmp files/directory
       fs.rmdirSync(dir.name, { recursive: true });
       // Respond
-      console.log(new Date(), `Analyze: #${recordJob.id} - Done Uploading & Creating Records`);
+      console.log(new Date(), `Analyze Form: #${recordJob.id} - Done Uploading & Creating Records`);
+      res.status(200).send({ jobId: recordJob.id, success: true });
+    } catch (e) {
+      console.log(e);
+      next({ message: e.message });
+    }
+  });
+
+router.post(
+  '/v1/analyze/text',
+  fileMiddleware.single('pdf'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) throw new Error('PDF key missing file passed as form-data.')
+      console.log(new Date(), `Analyze Text: New Job`);
+      // Create database record
+      const recordJob = await knex('record_job')
+        .insert({
+          createdAt: new Date(),
+          type: TEXTRACT_TYPES.TEXT,
+          note: req.file.originalname,
+        })
+        .returning('*')
+        .then((res) => res[0]);
+      console.log(new Date(), `Analyze Text: New Job Created - #${recordJob.id}`);
+      // Queue an analysis job for pdf
+      const file = await upload(req.file.originalname, req.file.buffer);
+      console.log(new Date(), `Analyze Text: #${recordJob.id} - Uploaded PDF`);
+      await knex('textract_job').insert({
+        recordJobId: recordJob.id,
+        fileBucket: file.bucket,
+        fileKey: file.key,
+        type: TEXTRACT_TYPES.TEXT,
+      });
+      console.log(new Date(), `Analyze Text: #${recordJob.id} - Uploaded & Created Record`);
       res.status(200).send({ jobId: recordJob.id, success: true });
     } catch (e) {
       console.log(e);
@@ -134,6 +175,9 @@ router.get(
     try {
       if (!req.params.recordJobId) throw new Error('Missing analysis job id');
       // Get related textract jobs for this internal job id
+      const recordJob = await knex('record_job')
+        .where('id', req.params.recordJobId)
+        .first();
       const textractJobs = await knex('textract_job')
         .where({ recordJobId: req.params.recordJobId })
         .returning('*');
@@ -141,24 +185,36 @@ router.get(
       if (textractJobs.some(job => job.data == null)) {
         return res.status(200).send({ status: 'inProgress', success: true });
       }
-      // Reformat keys depending on document
-      // TODO: If CSV query param, restructure
-      const data = Object.values(textractJobs.reduce((obj, job) => ({
-        [job.page]: getStructuredUseOfForceReportData(job.data.Blocks),
-        ...obj,
-      }), {}));
-      // Respond
-      if (req.query.format === 'csv') {
-        if (data.length === 0) {
-          res.status(200).type('text/plain').send('');
-        } else {
+
+      if (recordJob.type === TEXTRACT_TYPES.FORM) {
+        // Reformat keys depending on document
+        // TODO: If CSV query param, restructure
+        const data = Object.values(textractJobs.reduce((obj, job) => ({
+          [job.page]: getStructuredUseOfForceReportData(job.data.Blocks),
+          ...obj,
+        }), {}));
+        // Respond
+        if (req.query.format === 'csv') {
+          if (data.length === 0) {
+            return res.status(200).type('text/plain').send('');
+          }
           const keys = Object.keys(data[0]);
           const str = `${keys.join(',')}\n${data.map(d => Object.values(d).map(v => `"${v.replace(/,/g,'')}"`).join(',')).join('\n')}`;
-          res.status(200).type('text/plain').send(str);
+          return res.status(200).type('text/plain').send(str);
+        } else {
+          return res.status(200).send({ data, status: 'done', success: true });
         }
-      } else {
-        res.status(200).send({ data, status: 'done', success: true });
       }
+
+      if (recordJob.type === TEXTRACT_TYPES.TEXT) {
+        const data = getPlainTextDocumentData(textractJobs[0].data.Blocks);
+        if (req.query.format === 'text') {
+          return res.status(200).type('text/plain').send(data);
+        }
+        return res.status(200).send({ data, status: 'done', success: true });
+      }
+
+      throw new Error('No job was found and/or processed');
     } catch (e) {
       console.log(e);
       next({ message: e.message });
