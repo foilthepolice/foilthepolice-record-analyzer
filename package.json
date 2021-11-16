@@ -4,7 +4,7 @@
   "description": "Test interface with AWS Textract + S3 to get structured data out of large report files",
   "main": "src/server.js",
   "dependencies": {
-    "aws-sdk": "^2.706.0",
+    "aws-sdk": "^2.814.0",
     "body-parser": "^1.19.0",
     "date-fns": "^2.14.0",
     "dotenv": "^8.2.0",
